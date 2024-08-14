@@ -1,0 +1,39 @@
+services:
+  db:
+    image: container-registry.oracle.com/mysql/community-server:8.0.36
+    platform: linux/amd64
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./containers/mysql/etc/my.cnf:/etc/my.cnf
+      - ./containers/mysql/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+    environment:
+      MYSQL_ROOT_PASSWORD: pass
+      MYSQL_DATABASE: example
+      MYSQL_USER: atlas
+      MYSQL_PASSWORD: pass
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "3306:3306"
+
+  atlas:
+    image: arigaio/atlas:0.26.0-distroless
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./db:/db
+    command:
+      - "schema"
+      - "apply"
+      - "-u"
+      - "mysql://atlas:pass@db:3306/example"
+      - "--to"
+      - "file://db/schema/example.hcl"
+      - "--auto-approve"
+
+volumes:
+  db_data:
